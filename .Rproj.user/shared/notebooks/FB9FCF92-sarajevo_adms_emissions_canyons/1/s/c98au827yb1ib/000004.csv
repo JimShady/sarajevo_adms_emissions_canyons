@@ -1,0 +1,2 @@
+"0","m <- mapview(ten_km_grid, map.types = 'Esri.WorldImagery', alpha.regions=0.1)"
+"0","mapshot(m, file = paste0(getwd(), ""map.png""), remove_controls = c(""zoomControl"", ""layersControl"", ""homeButton"",""scaleBar""))"
