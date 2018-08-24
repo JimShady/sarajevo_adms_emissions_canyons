@@ -46,14 +46,29 @@ mapshot(m, file = paste0(getwd(), "/map.png"), remove_controls = c("zoomControl"
 
 For each grid square in the ten_km_grid (`r nrow(ten_km_grid)`) download the roads and buildings from OSM.
 
-```{r download_osm_data}
+```{r setup_for_download}
+
+major_roads <- c('motorway', 'motorway link', 'trunk', 'trunk link', 'primary', 'primary link', 'secondary', 'tertiary')
+minor_roads <- c('residential', 'service', 'unclassified')
+
+api_list <- c('http://overpass-api.de/api/interpreter',
+              'https://lz4.overpass-api.de/api/interpreter',
+              'https://z.overpass-api.de/api/interpreter',
+              'https://overpass.kumi.systems/api/interpreter')
+
+roads_to_import <- c(major_roads, minor_roads)
+```
+
+```{r download_data}
 
 for (i in 1:nrow(ten_km_grid)) {
   
-  roads_to_import <- c('primary', 'secondary', 'motorway', 'trunk', 'tertiary', 'residential')
-  
   ## Download the roads in that square, by road type in turn
   for (j in 1:length(roads_to_import)){
+    
+    api_to_use <- sample(1:length(api_list), 1)
+  
+    set_overpass_url(api_list[api_to_use])
     
     temp_road <- opq(bbox = st_bbox(ten_km_grid[i,])) %>%
                       add_osm_feature(key = 'highway', value= roads_to_import[j]) %>% 
@@ -77,6 +92,8 @@ for (i in 1:nrow(ten_km_grid)) {
       
       ## Bind the roads to the previous roads if they exist
       if (!exists('grid_roads')) {grid_roads <- temp_road} else {grid_roads <- rbind(grid_roads, temp_road)}
+      
+       grid_roads <- st_intersection(grid_roads, ten_km_grid[i,])
     
     }
     
@@ -87,27 +104,42 @@ for (i in 1:nrow(ten_km_grid)) {
   
   if (exists('grid_roads')) {
     
-          grid_roads <- st_crop(grid_roads, ten_km_grid[i,])
+          # Crop the roads to the exact box rather than the bbox
+         
           
           print(paste0('There were ', nrow(grid_roads), ' roads in this grid'))
           
-          grid_roads[grid_roads$highway == 'primary'     & is.na(grid_roads$lanes),'lanes'] <- 2
-          grid_roads[grid_roads$highway == 'secondary'   & is.na(grid_roads$lanes),'lanes'] <- 2
-          grid_roads[grid_roads$highway == 'motorway'    & is.na(grid_roads$lanes),'lanes'] <- 3
-          grid_roads[grid_roads$highway == 'trunk'       & is.na(grid_roads$lanes),'lanes'] <- 3
-          grid_roads[grid_roads$highway == 'tertiary'    & is.na(grid_roads$lanes),'lanes'] <- 2
-          grid_roads[grid_roads$highway == 'residential' & is.na(grid_roads$lanes),'lanes'] <- 2
+          grid_roads[grid_roads$highway == 'primary'          & is.na(grid_roads$lanes),'lanes'] <- 2
+          grid_roads[grid_roads$highway == 'primary link'     & is.na(grid_roads$lanes),'lanes'] <- 2
+          grid_roads[grid_roads$highway == 'secondary'        & is.na(grid_roads$lanes),'lanes'] <- 2
+          grid_roads[grid_roads$highway == 'motorway'         & is.na(grid_roads$lanes),'lanes'] <- 3
+          grid_roads[grid_roads$highway == 'motorway link'    & is.na(grid_roads$lanes),'lanes'] <- 3
+          grid_roads[grid_roads$highway == 'trunk'            & is.na(grid_roads$lanes),'lanes'] <- 3
+          grid_roads[grid_roads$highway == 'trunk link'       & is.na(grid_roads$lanes),'lanes'] <- 3
+          grid_roads[grid_roads$highway == 'tertiary'         & is.na(grid_roads$lanes),'lanes'] <- 2
+          grid_roads[grid_roads$highway == 'residential'      & is.na(grid_roads$lanes),'lanes'] <- 2
+          grid_roads[grid_roads$highway == 'service'          & is.na(grid_roads$lanes),'lanes'] <- 2
+          grid_roads[grid_roads$highway == 'unclassified'     & is.na(grid_roads$lanes),'lanes'] <- 2
           
           grid_roads[nchar(grid_roads$maxspeed) == 6 & !is.na(grid_roads$maxspeed),'maxspeed'] <- substr(grid_roads[nchar(grid_roads$maxspeed) == 6 & !is.na(grid_roads$maxspeed),]$maxspeed,1,2)
           
-          grid_roads[grid_roads$highway == 'primary'     & is.na(grid_roads$maxspeed),'maxspeed'] <- 30
-          grid_roads[grid_roads$highway == 'secondary'   & is.na(grid_roads$maxspeed),'maxspeed'] <- 30
-          grid_roads[grid_roads$highway == 'motorway'    & is.na(grid_roads$maxspeed),'maxspeed'] <- 70
-          grid_roads[grid_roads$highway == 'trunk'       & is.na(grid_roads$maxspeed),'maxspeed'] <- 40
-          grid_roads[grid_roads$highway == 'tertiary'    & is.na(grid_roads$maxspeed),'maxspeed'] <- 30
-          grid_roads[grid_roads$highway == 'residential' & is.na(grid_roads$maxspeed),'maxspeed'] <- 30
+          grid_roads[grid_roads$highway == 'primary'          & is.na(grid_roads$maxspeed),'maxspeed'] <- 30
+          grid_roads[grid_roads$highway == 'primary link'     & is.na(grid_roads$maxspeed),'maxspeed'] <- 30
+          grid_roads[grid_roads$highway == 'secondary'        & is.na(grid_roads$maxspeed),'maxspeed'] <- 30
+          grid_roads[grid_roads$highway == 'motorway'         & is.na(grid_roads$maxspeed),'maxspeed'] <- 70
+          grid_roads[grid_roads$highway == 'motorway link'    & is.na(grid_roads$maxspeed),'maxspeed'] <- 70
+          grid_roads[grid_roads$highway == 'trunk'            & is.na(grid_roads$maxspeed),'maxspeed'] <- 40
+          grid_roads[grid_roads$highway == 'trunk link'       & is.na(grid_roads$maxspeed),'maxspeed'] <- 40
+          grid_roads[grid_roads$highway == 'tertiary'         & is.na(grid_roads$maxspeed),'maxspeed'] <- 30
+          grid_roads[grid_roads$highway == 'residential'      & is.na(grid_roads$maxspeed),'maxspeed'] <- 30
+          grid_roads[grid_roads$highway == 'service'          & is.na(grid_roads$maxspeed),'maxspeed'] <- 30
+          grid_roads[grid_roads$highway == 'unclassified'     & is.na(grid_roads$maxspeed),'maxspeed'] <- 30
     
   }
+  
+  # Having got all the roads in this grid square, and harmonised, them, crop to the exact grid square as was just the bbox before
+  
+  print(paste0('Done ', i))
   
 } 
 
