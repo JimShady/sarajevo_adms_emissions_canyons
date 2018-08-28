@@ -15,15 +15,14 @@ library(mapview)
 library(knitr)
 library(kableExtra)
 
-
 ```
 
 Import a 2km and 10km grid file for Europe CMAQ cities. The 2km grid file has a domain name in it, but the 10km does not, so use the 2km grid to remove data from the 10km grid that we are not interested in.
 
 ```{r get_sarajevo_grids, include=F}
   
-ten_km_grid   <- suppressMessages(st_read('../emep_emissions_onto_osm/cmaq_grid/cmaq_cities_10km_grids.shp')) %>% st_transform(4326)
-two_km_grid   <- suppressMessages(st_read('../emep_emissions_onto_osm/cmaq_grid/CMAQ2km_47domains.shp')) %>% st_transform(4326)
+ten_km_grid   <- st_read('../emep_emissions_onto_osm/cmaq_grid/cmaq_cities_10km_grids.shp') %>% st_transform(4326)
+two_km_grid   <- st_read('../emep_emissions_onto_osm/cmaq_grid/CMAQ2km_47domains.shp') %>% st_transform(4326)
 
 domain        <- 'SARA2'
 
@@ -38,7 +37,7 @@ rm(two_km_grid)
 End up with a file which gives a 10km grid covering the domain (`r print(domain)`) of interest.
 
 ```{r map_of_domain, include=F}
-m <- mapview(ten_km_grid, map.types = 'Esri.WorldImagery', alpha.regions=0.1)
+m <- mapview(ten_km_grid, map.types = 'OpenStreetMap', alpha.regions=0.1)
 mapshot(m, file = paste0(getwd(), "/map.png"), remove_controls = c("zoomControl", "layersControl", "homeButton","scaleBar"))
 ```
 
@@ -81,12 +80,14 @@ Now download the data for the domain by road type, harmonise, then join them all
       ## If columns are missing, add them. Also re-order and change to charaters where needed
       if ('maxspeed' %in% names(temp_road))  {} else{temp_road$maxspeed <- NA}
       if ('lanes'    %in% names(temp_road))  {} else{temp_road$lanes    <- NA}
+      if ('oneway'   %in% names(temp_road))  {} else{temp_road$oneway   <- NA}
       if ('highway'  %in% names(temp_road))  {} else{temp_road$highway  <- as.character(roads_to_import[j])}
       if ('osm_id'   %in% names(temp_road))  {} else{temp_road$osm_id   <- as.character(row.names(temp_road))}
       
-      temp_road <- temp_road[,c('osm_id', 'highway', 'lanes', 'maxspeed', 'geometry')]
+      temp_road <- temp_road[,c('osm_id', 'highway', 'lanes', 'maxspeed', 'oneway', 'geometry')]
       
       temp_road$highway  <- as.character(temp_road$highway)
+      temp_road$oneway   <- as.character(temp_road$oneway)
       temp_road$lanes    <- as.character(temp_road$lanes)
       temp_road$maxspeed <- as.character(temp_road$maxspeed)
       
@@ -109,9 +110,9 @@ grid_roads          <- st_intersection(grid_roads, ten_km_grid)
 
 ```
 
-Of the data we have downloaded from OSM, `r nrow(grid_roads[is.na(grid_roads$lanes),])` rows have no lane data (`r nrow(grid_roads[is.na(grid_roads$lanes),])/nrow(grid_roads)`%). So we fill that in as below.
+Of the data we have downloaded from OSM, `r nrow(grid_roads[is.na(grid_roads$lanes),])` rows have no lane data (`r round(100 * (nrow(grid_roads[is.na(grid_roads$lanes),])/nrow(grid_roads)),0)`%). So we fill that in as below.
 
-```{r add_missing_lane_data, include=F}
+```{r add_missing_lane_data}
 
 grid_roads[grid_roads$highway == 'primary'          & is.na(grid_roads$lanes),'lanes'] <- 2
 grid_roads[grid_roads$highway == 'primary link'     & is.na(grid_roads$lanes),'lanes'] <- 2
@@ -127,9 +128,9 @@ grid_roads[grid_roads$highway == 'unclassified'     & is.na(grid_roads$lanes),'l
 
 ```
 
-Of the data we have downloaded from OSM, `r nrow(grid_roads[is.na(grid_roads$maxspeed),])` rows have no speed limit data (`r nrow(grid_roads[is.na(grid_roads$maxspeed),])/nrow(grid_roads)`%). So we also fill that in as follows.
+Of the data we have downloaded from OSM, `r nrow(grid_roads[is.na(grid_roads$maxspeed),])` rows have no speed limit data (`r round(100 * (nrow(grid_roads[is.na(grid_roads$maxspeed),])/nrow(grid_roads)),0)`%). So we also fill that in as follows.
 
-```{r add_missing_speed_data, include=F}
+```{r add_missing_speed_data}
 
 grid_roads[grid_roads$highway == 'primary'          & is.na(grid_roads$maxspeed),'maxspeed'] <- 30
 grid_roads[grid_roads$highway == 'primary link'     & is.na(grid_roads$maxspeed),'maxspeed'] <- 30
@@ -145,16 +146,22 @@ grid_roads[grid_roads$highway == 'unclassified'     & is.na(grid_roads$maxspeed)
 
 ```
 
+of the data, `r round(100 * nrow(grid_roads[!(grid_roads$oneway %in% c('yes','no')),]) / nrow(grid_roads),0)`% has no entry or an ambigious entry in the oneway column, so if the entry isn't 'yes' or 'no, presume that the default is 'no', and fill that in.
+
+```{r fill_missing_one_way}
+grid_roads[!(grid_roads$oneway %in% c('yes','no')),'oneway'] <- 'no'
+```
+
 The final roads for the domain look like this
 
-```{r plot_roads}
-plot(st_geometry(grid_roads), col='blue')
+```{r plot_roads, echo=F}
+ggplot(grid_roads) + geom_sf(aes(colour = highway))
 ```
 
 And the data is in this format
 
-```{r roads_example}
-head(grid_roads) %>%
+```{r roads_example, echo=F}
+head(data.frame(head(grid_roads))[,-12]) %>%
   kable() %>%
   kable_styling()
 ```
