@@ -47,7 +47,7 @@ For each grid square in the ten_km_grid (`r nrow(ten_km_grid)`) download the roa
 
 ```{r setup_for_download, include=F}
 
-major_roads <- c('motorway', 'motorway link', 'trunk', 'trunk link', 'primary', 'primary link', 'secondary', 'tertiary')
+major_roads <- c('motorway', 'motorway_link', 'trunk', 'trunk_link', 'primary', 'primary_link', 'secondary', 'tertiary')
 minor_roads <- c('residential', 'service', 'unclassified')
 
 api_list <- c('http://overpass-api.de/api/interpreter',
